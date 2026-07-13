@@ -87,10 +87,12 @@ export) is already prepared. Just run the import:
 ```powershell
 cd "d:\projects\New folder\optical-crm"
 
+
+
 # Replace the placeholders. The second value is the SECRET key
 # (sb_secret_..., click Reveal on the API Keys page) — keep it secret.
-$env:SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co"
-$env:SUPABASE_SERVICE_ROLE_KEY = "PASTE-SECRET-KEY"
+$env:SUPABASE_URL = "https://nogzeilgpnoiriaprhav.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY = "PASTE-SECRET-KEY-HERE"   # never save the real key in a file
 node migration/import.mjs
 ```
 
@@ -119,21 +121,27 @@ git push -u origin main
 
 `.gitignore` already blocks `.env` and the customer-data JSON files from being uploaded.
 
-## 5. Deploy to Cloudflare Pages (the live website)
+## 5. Deploy to Cloudflare (the live website)
 
 1. <https://dash.cloudflare.com/sign-up> → sign up **with the shop's Gmail**.
-2. **Workers & Pages → Create → Pages → Connect to Git** → authorize GitHub →
+2. **Workers & Pages → Create → Import a repository** → authorize GitHub →
    pick the `optical-crm` repo.
-3. Build settings:
-   - Framework preset: **Vite** (or set manually)
+3. On the "Set up your application" form:
+   - Project name: `optical-crm`
    - Build command: `npm run build`
-   - Build output directory: `dist`
-4. **Environment variables** (same two values as `.env`):
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-5. **Save and Deploy.** After a minute you get `https://optical-crm-XXX.pages.dev` —
-   open it on the shop desktop, sign in once, bookmark it, done.
-   (A custom domain can be added later in Pages → Custom domains if wanted.)
+   - Deploy command: `npx wrangler deploy` (the default — it reads `wrangler.jsonc`
+     from the repo, which serves the built `dist/` folder as a single-page app)
+   - Path, non-production branch settings: leave the defaults
+   - API token: leave on "Create new token" (automatic)
+   - **Variables** — add both, NOT encrypted (they must be readable at build time,
+     and neither is a secret):
+     - `VITE_SUPABASE_URL` = the project URL
+     - `VITE_SUPABASE_ANON_KEY` = the publishable key
+4. **Create and deploy.** After a minute or two you get
+   `https://optical-crm.<something>.workers.dev` — open it, sign in once,
+   bookmark it on the shop's devices, done.
+   (A custom domain can be added later in the Worker's Settings → Domains & Routes.)
+5. From now on, every `git push` to `main` redeploys the site automatically.
 
 ## 6. Go-live day checklist (do these in one morning)
 

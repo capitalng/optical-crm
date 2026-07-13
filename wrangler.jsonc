@@ -1,0 +1,11 @@
+// Cloudflare Workers config: serve the built Vite app as a static site.
+// "single-page-application" makes deep links like /customer/123 load the app
+// instead of returning 404 (React Router handles the path in the browser).
+{
+  "name": "optical-crm",
+  "compatibility_date": "2026-07-13",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
