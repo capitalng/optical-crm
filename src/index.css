@@ -460,43 +460,37 @@ textarea:focus {
   font-size: 14px;
 }
 
-/* ---------- customer labels (tags) ---------- */
+/* ---------- customer labels: discreet colored dots ---------- */
 
-.tag {
-  display: inline-block;
-  font-size: 11px;
+.dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  margin-left: 7px;
+  vertical-align: 2px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 3px 9px;
-  border-radius: 99px;
-  margin-left: 8px;
-  vertical-align: 3px;
-  white-space: nowrap;
+  color: #fff;
+  border: 1.5px solid rgba(0, 0, 0, 0.25);
 }
 
-.tag-vip {
-  background: #fdf3d7;
-  color: #8a6100;
-  border: 1px solid #ecd28a;
+.dot-vip {
+  background: #e0a800;
 }
 
-.tag-generous {
-  background: #e0f2ee;
-  color: var(--primary-dark);
-  border: 1px solid #a9d8cd;
+.dot-generous {
+  background: #2e9e6b;
 }
 
-.tag-problematic {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid #f0b6ae;
+.dot-problematic {
+  background: #d64541;
 }
 
-.tag-custom {
-  background: #eef1f4;
-  color: var(--muted);
-  border: 1px solid var(--border);
+.dot-custom {
+  background: #7a8794;
 }
 
 .field-label {

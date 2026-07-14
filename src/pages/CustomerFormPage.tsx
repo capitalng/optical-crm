@@ -189,6 +189,9 @@ export default function CustomerFormPage() {
                 className={`tag-toggle ${tags.includes(t) ? 'on' : ''}`}
                 onClick={() => toggleTag(t)}
               >
+                <span
+                  className={`dot ${t === 'VIP' ? 'dot-vip' : t === 'GENEROUS' ? 'dot-generous' : 'dot-problematic'}`}
+                />{' '}
                 {TAG_LABELS[t]}
               </button>
             ))}

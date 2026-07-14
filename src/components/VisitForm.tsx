@@ -17,7 +17,7 @@ const RX_LABELS: Record<(typeof RX_FIELDS)[number], string> = {
 /** Which columns each item type shows. Everything is optional — freedom first. */
 const ITEM_FIELDS: Record<ItemType, Array<keyof ItemDraft>> = {
   frame: ['brand', 'model', 'color', 'price'],
-  lens: ['brand', 'intake', 'thickness', 'price'],
+  lens: ['brand', 'thickness', 'price'],
   contact_lens: ['brand', 'color', 'quantity', 'price'],
   other: ['description', 'quantity', 'price'],
 }

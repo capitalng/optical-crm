@@ -343,7 +343,6 @@ function VisitRows({
                       <th>Brand</th>
                       <th>Model / Description</th>
                       <th>Color</th>
-                      <th>Intake</th>
                       <th>Thickness</th>
                       <th>Qty</th>
                       <th className="num">Price (RM)</th>
@@ -356,7 +355,6 @@ function VisitRows({
                         <td>{it.brand ?? '—'}</td>
                         <td>{it.model ?? it.description ?? '—'}</td>
                         <td>{it.color ?? '—'}</td>
-                        <td>{it.intake ?? '—'}</td>
                         <td>{it.thickness ?? '—'}</td>
                         <td>{it.quantity ?? '—'}</td>
                         <td className="num">{it.price != null ? it.price.toFixed(2) : '—'}</td>
