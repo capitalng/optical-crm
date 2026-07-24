@@ -493,6 +493,56 @@ textarea:focus {
   background: #7a8794;
 }
 
+.dot-blue {
+  background: #2f6fd6;
+}
+
+.dot-purple {
+  background: #8e44ad;
+}
+
+.dot-orange {
+  background: #e67e22;
+}
+
+.dot-pink {
+  background: #e05c8a;
+}
+
+.dot-black {
+  background: #22292f;
+}
+
+/* Round tap-targets for the label editor — dot only, no words */
+.dot-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.dot-toggle .dot {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  opacity: 0.4;
+}
+
+.dot-toggle.on {
+  border-color: var(--pcard-line);
+  box-shadow: 0 0 0 2px rgba(20, 33, 43, 0.25);
+}
+
+.dot-toggle.on .dot {
+  opacity: 1;
+}
+
 .field-label {
   font-size: 14px;
   font-weight: 600;
@@ -865,6 +915,69 @@ textarea:focus {
 .receipt-total .receipt-input {
   font-weight: 700;
   font-size: 18px;
+}
+
+/* ---------- visit type (glasses / contact lens) ---------- */
+
+.visit-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.visit-form-head h3 {
+  margin: 0;
+}
+
+.vtype-toggle {
+  display: flex;
+  gap: 0;
+  border: 2px solid var(--pcard-line);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.vtype-toggle button {
+  font: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 8px 16px;
+  border: none;
+  background: #fff;
+  color: var(--pcard-line);
+  cursor: pointer;
+}
+
+.vtype-toggle button + button {
+  border-left: 2px solid var(--pcard-line);
+}
+
+.vtype-toggle button.on {
+  background: var(--primary-dark);
+  color: #fff;
+}
+
+.vtype-pill {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--pcard-line);
+  white-space: nowrap;
+}
+
+.vtype-glasses {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.vtype-contact_lens {
+  background: #e7d9f2;
 }
 
 /* ---------- visit form in blue-card style ---------- */

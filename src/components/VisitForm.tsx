@@ -101,6 +101,22 @@ function discountToRm(raw: string, subtotal: number | null): number | null {
   return Number.isNaN(n) ? null : n
 }
 
+/**
+ * Shorthand diopter entry: SPH/CYL/ADD are always x.xx, so staff can skip the
+ * dot — "-125" becomes "-1.25", "275" becomes "2.75", "+175" typed with a dot
+ * stays as typed. Anything that isn't a plain signed integer (e.g. "PL",
+ * "1.75") passes through untouched.
+ */
+function normalizeDiopter(raw: string): string {
+  const s = raw.trim()
+  if (!/^[+-]?\d+$/.test(s)) return raw
+  const sign = s.startsWith('+') ? '+' : ''
+  const value = Number(s) / 100
+  return sign + value.toFixed(2)
+}
+
+const DIOPTER_FIELDS = new Set(['sph', 'cyl', 'add'])
+
 interface Props {
   customerId: string
   existing?: VisitWithItems
@@ -114,6 +130,9 @@ function today(): string {
 
 export default function VisitForm({ customerId, existing, onSaved, onCancel }: Props) {
   const [visitDate, setVisitDate] = useState(existing?.visit_date ?? today())
+  const [visitType, setVisitType] = useState<'glasses' | 'contact_lens' | null>(
+    existing?.visit_type ?? null,
+  )
   const [optometrist, setOptometrist] = useState(existing?.optometrist ?? '')
   const [discount, setDiscount] = useState(existing?.discount ?? '')
   const [totalRm, setTotalRm] = useState(existing?.total_rm != null ? String(existing.total_rm) : '')
@@ -207,11 +226,19 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
     const visitPayload = {
       customer_id: customerId,
       visit_date: visitDate || null,
+      visit_type: visitType,
       optometrist: clean(optometrist),
       discount: clean(discount),
       total_rm: total,
       notes: clean(notes),
-      ...Object.fromEntries(Object.entries(rx).map(([k, v]) => [k, clean(v)])),
+      // Safety net: apply the shorthand rule on save too, in case a field
+      // never lost focus before the submit.
+      ...Object.fromEntries(
+        Object.entries(rx).map(([k, v]) => [
+          k,
+          clean(DIOPTER_FIELDS.has(k.slice(2)) ? normalizeDiopter(v) : v),
+        ]),
+      ),
     }
 
     let visitId = existing?.id
@@ -262,7 +289,21 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
 
   return (
     <form className="visit-form card pcard-form" onSubmit={onSubmit}>
-      <h3>{existing ? 'Edit visit' : 'New visit'}</h3>
+      <div className="visit-form-head">
+        <h3>{existing ? 'Edit visit' : 'New visit'}</h3>
+        <div className="vtype-toggle">
+          {(['glasses', 'contact_lens'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={visitType === t ? 'on' : ''}
+              onClick={() => setVisitType(visitType === t ? null : t)}
+            >
+              {t === 'glasses' ? '👓 Glasses' : 'Contact lens'}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="visit-meta-row">
         <label>
@@ -301,6 +342,11 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
                       type="text"
                       value={rx[key]}
                       onChange={(e) => setRxField(key, e.target.value)}
+                      onBlur={
+                        DIOPTER_FIELDS.has(f)
+                          ? () => setRxField(key, normalizeDiopter(rx[key]))
+                          : undefined
+                      }
                       placeholder={f === 'va' ? '1.0' : f === 'add' ? '+2.00' : ''}
                     />
                   </td>

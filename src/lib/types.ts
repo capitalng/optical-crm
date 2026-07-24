@@ -23,6 +23,7 @@ export interface Visit {
   id: string
   customer_id: string
   visit_date: string | null
+  visit_type: 'glasses' | 'contact_lens' | null
   optometrist: string | null
   r_sph: string | null
   r_cyl: string | null
@@ -73,11 +74,19 @@ export const ITEM_TYPE_LABELS: Record<ItemType, string> = {
   other: 'Other',
 }
 
-/** Preset customer labels; any custom text tag is also allowed. */
+/** Preset customer labels with fixed meanings. */
 export const PRESET_TAGS = ['VIP', 'GENEROUS', 'PROBLEMATIC'] as const
+
+/** Extra dot colors with no fixed meaning — the shop decides what each means. */
+export const COLOR_TAGS = ['BLUE', 'PURPLE', 'ORANGE', 'PINK', 'BLACK'] as const
 
 export const TAG_LABELS: Record<string, string> = {
   VIP: 'VIP',
   GENEROUS: 'Generous',
   PROBLEMATIC: 'Problematic',
+  BLUE: 'Blue label',
+  PURPLE: 'Purple label',
+  ORANGE: 'Orange label',
+  PINK: 'Pink label',
+  BLACK: 'Black label',
 }

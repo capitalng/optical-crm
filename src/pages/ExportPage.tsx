@@ -22,6 +22,7 @@ const TABLES: Record<string, string[]> = {
   visits: [
     'customer_id',
     'visit_date',
+    'visit_type',
     'optometrist',
     'r_sph', 'r_cyl', 'r_axis', 'r_add', 'r_va', 'r_pd',
     'l_sph', 'l_cyl', 'l_axis', 'l_add', 'l_va', 'l_pd',

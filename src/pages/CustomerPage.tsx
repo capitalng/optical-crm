@@ -306,6 +306,11 @@ function VisitRows({
       <tr className="row-link rx-r-row" onClick={onToggle}>
         <td rowSpan={2} className="vspan">
           {formatDate(v.visit_date)}
+          {v.visit_type && (
+            <div className={`vtype-pill vtype-${v.visit_type}`}>
+              {v.visit_type === 'glasses' ? '👓 Glasses' : 'Contact lens'}
+            </div>
+          )}
         </td>
         <th className="pcard-eye">R</th>
         {RX_COLS.map((f) => (

@@ -78,6 +78,7 @@ create table public.visits (
   id           uuid primary key default gen_random_uuid(),
   customer_id  uuid not null references public.customers (id) on delete cascade,
   visit_date   date,
+  visit_type   text check (visit_type in ('glasses', 'contact_lens')),
   optometrist  text,
   r_sph text, r_cyl text, r_axis text, r_add text, r_va text, r_pd text,
   l_sph text, l_cyl text, l_axis text, l_add text, l_va text, l_pd text,

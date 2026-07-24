@@ -3,7 +3,14 @@ import type { FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Customer } from '../lib/types'
-import { PRESET_TAGS, TAG_LABELS } from '../lib/types'
+import { COLOR_TAGS, TAG_LABELS } from '../lib/types'
+
+const TOGGLE_DOTS: Array<{ tag: string; dotClass: string }> = [
+  { tag: 'VIP', dotClass: 'dot-vip' },
+  { tag: 'GENEROUS', dotClass: 'dot-generous' },
+  { tag: 'PROBLEMATIC', dotClass: 'dot-problematic' },
+  ...COLOR_TAGS.map((t) => ({ tag: t, dotClass: `dot-${t.toLowerCase()}` })),
+]
 
 const EMPTY = {
   ref_no: '',
@@ -26,7 +33,6 @@ export default function CustomerFormPage() {
   const navigate = useNavigate()
   const [form, setForm] = useState<FormState>(EMPTY)
   const [tags, setTags] = useState<string[]>([])
-  const [customTag, setCustomTag] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(isEdit)
@@ -67,12 +73,6 @@ export default function CustomerFormPage() {
 
   function toggleTag(tag: string) {
     setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
-  }
-
-  function addCustomTag() {
-    const t = customTag.trim().toUpperCase()
-    if (t && !tags.includes(t)) setTags((prev) => [...prev, t])
-    setCustomTag('')
   }
 
   async function onSubmit(e: FormEvent) {
@@ -182,21 +182,22 @@ export default function CustomerFormPage() {
         <div className="form-wide">
           <span className="field-label">Labels</span>
           <div className="tag-editor">
-            {PRESET_TAGS.map((t) => (
+            {TOGGLE_DOTS.map(({ tag, dotClass }) => (
               <button
-                key={t}
+                key={tag}
                 type="button"
-                className={`tag-toggle ${tags.includes(t) ? 'on' : ''}`}
-                onClick={() => toggleTag(t)}
+                className={`dot-toggle ${tags.includes(tag) ? 'on' : ''}`}
+                title={TAG_LABELS[tag] ?? tag}
+                aria-label={TAG_LABELS[tag] ?? tag}
+                aria-pressed={tags.includes(tag)}
+                onClick={() => toggleTag(tag)}
               >
-                <span
-                  className={`dot ${t === 'VIP' ? 'dot-vip' : t === 'GENEROUS' ? 'dot-generous' : 'dot-problematic'}`}
-                />{' '}
-                {TAG_LABELS[t]}
+                <span className={`dot ${dotClass}`} />
               </button>
             ))}
+            {/* Legacy free-text labels from before the color system */}
             {tags
-              .filter((t) => !(PRESET_TAGS as readonly string[]).includes(t))
+              .filter((t) => !TOGGLE_DOTS.some((d) => d.tag === t))
               .map((t) => (
                 <button
                   key={t}
@@ -208,20 +209,6 @@ export default function CustomerFormPage() {
                   {t} ✕
                 </button>
               ))}
-            <input
-              type="text"
-              className="tag-input"
-              placeholder="+ custom label"
-              value={customTag}
-              onChange={(e) => setCustomTag(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  addCustomTag()
-                }
-              }}
-              onBlur={addCustomTag}
-            />
           </div>
         </div>
 
