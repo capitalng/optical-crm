@@ -961,8 +961,9 @@ textarea:focus {
 }
 
 .vtype-pill {
-  display: inline-block;
-  margin-top: 5px;
+  display: block;
+  width: fit-content;
+  margin: 5px auto 0;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
