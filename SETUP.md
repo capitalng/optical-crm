@@ -156,6 +156,44 @@ git push -u origin main
 5. Test the **Export** page once — download both CSVs and put them in the shop's
    Google Drive. Repeat weekly (or monthly at minimum). This is the backup.
 
+## 6b. Attached scans and documents — housekeeping
+
+Scans (PDFs and photos) attached to customers live in a **private** Supabase Storage
+bucket called `customer-docs`, separate from the database.
+
+**Storage plan — read this before uploading in bulk.** Photos are shrunk in the browser
+before upload (long edge 2000px, JPEG), which turns a typical 3–4 MB camera photo into
+roughly 300–500 KB. Even so:
+
+| What the shop stores | Roughly | Fits the free 1 GB? |
+|---|---|---|
+| New visits only, ~30-40% get a scan | ~0.2 GB/year | Yes, for several years |
+| Backfilling ~35% of all 23,885 customers | **5–10 GB** | **No — needs Supabase Pro** |
+
+Since the shop plans to build up scans for existing customers too, budget for
+**Supabase Pro (~USD 25/month)**: 100 GB of storage, plus the automatic daily backups
+the free plan does not have. Watch the meter on the Export page — it warns at 80% — and
+upgrade in Dashboard → Settings → Billing. After upgrading, change `PLAN_STORAGE_BYTES`
+in `src/lib/documents.ts` to `100 * 1024 ** 3` so the meter shows the right ceiling.
+
+Three other things to know:
+
+1. **Never make the bucket public.** Dashboard → Storage → `customer-docs` must always
+   read *Private*. These are medical records; a public bucket means anyone with the URL
+   can read them. Re-running `supabase/patch-customer-documents.sql` resets it if it is
+   ever changed by accident.
+2. **The CSV export does not contain the files.** "Document list (CSV)" on the Export page
+   records which file belongs to which customer; the files themselves need their own copy:
+   ```powershell
+   supabase storage cp -r ss://customer-docs ./optical-scans-backup --experimental
+   ```
+   (Or download them from Dashboard → Storage.) Do this alongside the CSV backups.
+3. **Files stay forever unless someone removes them**, and a removed file still occupies
+   space until it is purged. See the commented-out housekeeping query at the bottom of
+   `supabase/patch-customer-documents.sql`.
+
+Accepted formats: PDF, JPEG, PNG, WebP, HEIC, TIFF — 25 MB per file.
+
 ## 7. Later / optional
 
 - **Supabase Pro (USD 25/mo)** — automatic daily backups + no free-tier idle pause.
@@ -166,5 +204,11 @@ git push -u origin main
   role-based restrictions are wanted.
 - **Nightly automated backup** — a GitHub Action that exports CSVs to Google Drive
   on a schedule. Ask Claude when ready.
+- **Automatic warranty messages** — today the Warranty page is a working list and staff
+  contact each customer themselves. Sending automatically would need Meta's WhatsApp
+  Cloud API: business verification, a payment card, pre-approved templates,
+  ~RM0.06/message, customer opt-in consent, and the shop's number could then no longer
+  be used in the WhatsApp Business *app*. Worth revisiting only if the list gets too
+  long to work through by hand.
 - **Retire the old site** — after 2–4 weeks of smooth running, ask the old
   developer/host to take `capital.ergroup.info` down.

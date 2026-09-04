@@ -1094,6 +1094,278 @@ textarea:focus {
   margin-top: 14px;
 }
 
+/* ---------- customer documents ---------- */
+
+.pcard-docs {
+  display: flex;
+  flex-direction: column;
+}
+
+.pcard-docs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.pcard-docs-head.has-docs {
+  border-bottom: 2px solid var(--pcard-line);
+}
+
+.doc-count {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+}
+
+.doc-file-input {
+  display: none;
+}
+
+.pcard-doc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--pcard-line);
+}
+
+.pcard-doc-row:last-child {
+  border-bottom: none;
+}
+
+.doc-icon {
+  font-size: 20px;
+}
+
+.doc-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.doc-name {
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--pcard-line);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.doc-name:hover {
+  text-decoration: underline dotted;
+}
+
+.doc-meta {
+  font-size: 13px;
+}
+
+.pcard-doc-row .error-box {
+  margin: 0;
+  width: 100%;
+}
+
+.removed-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.link-button {
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.removed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.removed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+}
+
+/* ---------- storage meter ---------- */
+
+.storage-bar {
+  height: 10px;
+  border-radius: 99px;
+  background: #e3e8ed;
+  overflow: hidden;
+  margin: 10px 0;
+}
+
+.storage-bar-fill {
+  height: 100%;
+  background: var(--primary);
+}
+
+/* ---------- collection tracking ---------- */
+
+.collect-block {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 2px dashed var(--pcard-line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.collect-switch {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--pcard-line);
+}
+
+.collect-switch input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  accent-color: var(--primary-dark);
+}
+
+.collect-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.collect-fields label {
+  flex: 1;
+  min-width: 200px;
+  margin: 0;
+}
+
+.warranty-due {
+  background: #fdf0d5;
+}
+
+.warranty-done {
+  background: #d9f2e4;
+}
+
+.collect-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fdf6e6;
+}
+
+/* ---------- follow-ups ---------- */
+
+.nav-badge {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  vertical-align: 1px;
+}
+
+.followup-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.followup-main {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.followup-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.followup-detail {
+  font-size: 15px;
+}
+
+.followup-detail .vtype-pill {
+  margin: 0 4px 0 0;
+}
+
+.followup-meta {
+  font-size: 13px;
+}
+
+.followup-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 190px;
+}
+
+.followup-phone {
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.followup-urgent {
+  border-left: 4px solid #e0a800;
+}
+
+.followup-remaining {
+  font-weight: 700;
+  color: #8a6100;
+}
+
+.followup-nonumber {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.followup-nonumber code {
+  overflow-wrap: anywhere;
+}
+
 /* ---------- responsive / touch ---------- */
 
 /* Bigger touch targets on tablets and phones (iPad + Apple Pencil friendly) */
@@ -1173,5 +1445,17 @@ textarea:focus {
 
   .receipt {
     max-width: none;
+  }
+
+  .pcard-doc-row {
+    flex-wrap: wrap;
+  }
+
+  .pcard-doc-row .btn-row {
+    width: 100%;
+  }
+
+  .followup-actions {
+    width: 100%;
   }
 }

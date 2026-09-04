@@ -85,12 +85,20 @@ create table public.visits (
   discount     text,          -- as written by staff: "20", "RM20", "30%", …
   total_rm     numeric(10, 2),
   notes        text,
+  -- Warranty follow-up is opt-in: false = nothing to chase (most visits).
+  warranty_followup     boolean not null default false,
+  warranty_note         text,
+  warranty_contacted_at timestamptz,
   deleted_at   timestamptz,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
 
 create index visits_customer on public.visits (customer_id, visit_date desc nulls last);
+
+create index visits_warranty_followup
+  on public.visits (visit_date)
+  where warranty_followup and warranty_contacted_at is null and deleted_at is null;
 
 -- ------------------------------------------------------------
 -- Purchase items: 0..n per visit. One flexible row type covers
@@ -114,6 +122,32 @@ create table public.visit_items (
 );
 
 create index visit_items_visit on public.visit_items (visit_id);
+
+-- ------------------------------------------------------------
+-- Customer documents: PDF eye scans / diagnostic reports attached
+-- to a customer (not to a single visit). The files live in the
+-- private "customer-docs" Storage bucket; this table is the index.
+-- See patch-customer-documents.sql for the bucket and its policies.
+-- ------------------------------------------------------------
+create table public.customer_documents (
+  id            uuid primary key default gen_random_uuid(),
+  customer_id   uuid not null references public.customers (id) on delete cascade,
+  storage_path  text not null unique,
+  file_name     text not null,
+  label         text,
+  doc_date      date,
+  byte_size     bigint,
+  content_type  text not null default 'application/pdf',
+  uploaded_by   uuid references auth.users (id) default auth.uid(),
+  deleted_at    timestamptz,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index customer_documents_customer
+  on public.customer_documents (customer_id, created_at desc);
+create index customer_documents_deleted_at
+  on public.customer_documents (deleted_at) where deleted_at is not null;
 
 -- ------------------------------------------------------------
 -- Auto ref no: "YYMM-NNNN" (e.g. 2607-0001), a per-month counter.
@@ -219,6 +253,66 @@ $$;
 
 create trigger customers_touch before update on public.customers for each row execute function public.touch_updated_at();
 create trigger visits_touch    before update on public.visits    for each row execute function public.touch_updated_at();
+create trigger customer_documents_touch before update on public.customer_documents for each row execute function public.touch_updated_at();
+
+-- ------------------------------------------------------------
+-- Customers still inside their warranty follow-up window, most
+-- urgent (closest to expiry) first. The clock starts at the visit
+-- date, falling back to when the record was created.
+-- ------------------------------------------------------------
+create function public.warranty_followups(window_days int default 180)
+returns table (
+  visit_id       uuid,
+  customer_id    uuid,
+  customer_name  text,
+  customer_phone text,
+  customer_tags  text[],
+  ref_no         text,
+  visit_date     date,
+  purchased_at   timestamptz,
+  warranty_note  text,
+  total_rm       numeric,
+  items          text
+)
+language sql stable
+as $
+  select
+    v.id, c.id, c.name, c.phone, c.tags, c.ref_no, v.visit_date,
+    coalesce(v.visit_date::timestamptz, v.created_at) as purchased_at,
+    v.warranty_note,
+    v.total_rm,
+    (
+      select string_agg(
+               coalesce(nullif(btrim(concat_ws(' ', i.brand, coalesce(i.model, i.description))), ''),
+                        initcap(replace(i.item_type, '_', ' '))),
+               ', ' order by i.created_at)
+      from public.visit_items i
+      where i.visit_id = v.id
+    ) as items
+  from public.visits v
+  join public.customers c on c.id = v.customer_id
+  where v.deleted_at is null
+    and c.deleted_at is null
+    and v.warranty_followup
+    and v.warranty_contacted_at is null
+    and coalesce(v.visit_date::timestamptz, v.created_at)
+        > now() - make_interval(days => window_days)
+  -- repeated rather than "order by purchased_at": that name is also a declared
+  -- output column, which Postgres would treat as an ambiguous reference.
+  order by coalesce(v.visit_date::timestamptz, v.created_at)
+$;
+
+-- Storage usage summary for the meter on the Export page.
+create or replace view public.customer_documents_usage
+with (security_invoker = on) as
+select
+  count(*) filter (where deleted_at is null)                        as active_count,
+  coalesce(sum(byte_size) filter (where deleted_at is null), 0)     as active_bytes,
+  count(*) filter (where deleted_at is not null)                    as deleted_count,
+  coalesce(sum(byte_size) filter (where deleted_at is not null), 0) as deleted_bytes
+from public.customer_documents;
+
+grant select on public.customer_documents_usage to authenticated;
 
 -- ------------------------------------------------------------
 -- Row Level Security: every table locked to signed-in staff.
@@ -230,10 +324,11 @@ create trigger visits_touch    before update on public.visits    for each row ex
 -- part of their visit, and deleting a visit soft-deletes them
 -- with it (they stay attached to the soft-deleted visit).
 -- ------------------------------------------------------------
-alter table public.profiles    enable row level security;
-alter table public.customers   enable row level security;
-alter table public.visits      enable row level security;
-alter table public.visit_items enable row level security;
+alter table public.profiles           enable row level security;
+alter table public.customers          enable row level security;
+alter table public.visits             enable row level security;
+alter table public.visit_items        enable row level security;
+alter table public.customer_documents enable row level security;
 
 create policy "staff read own profile"
   on public.profiles for select
@@ -262,3 +357,12 @@ create policy "staff update visit items"
   on public.visit_items for update to authenticated using (true);
 create policy "staff delete visit items"
   on public.visit_items for delete to authenticated using (true);
+
+-- Documents: no delete policy — removal is a soft delete, and the
+-- storage bucket likewise grants no delete (see patch-customer-documents.sql).
+create policy "staff read customer documents"
+  on public.customer_documents for select to authenticated using (true);
+create policy "staff insert customer documents"
+  on public.customer_documents for insert to authenticated with check (true);
+create policy "staff update customer documents"
+  on public.customer_documents for update to authenticated using (true);

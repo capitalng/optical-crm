@@ -6,6 +6,7 @@ import { ITEM_TYPE_LABELS } from '../lib/types'
 import VisitForm from '../components/VisitForm'
 import TagBadges from '../components/TagBadges'
 import ConfirmDialog from '../components/ConfirmDialog'
+import CustomerDocuments from '../components/CustomerDocuments'
 
 const RX_COLS = ['sph', 'cyl', 'axis', 'add', 'va', 'pd'] as const
 
@@ -91,6 +92,18 @@ export default function CustomerPage() {
     else if (!data || data.length === 0)
       setError('Delete failed: the database did not update the record (check that the app is signed in and the schema policies are in place).')
     else navigate('/')
+  }
+
+  async function markContacted(v: VisitWithItems) {
+    const { data, error } = await supabase
+      .from('visits')
+      .update({ warranty_contacted_at: new Date().toISOString() })
+      .eq('id', v.id)
+      .select('id')
+    if (error) setError('Could not update: ' + error.message)
+    else if (!data || data.length === 0)
+      setError('Could not update: the database did not change the record.')
+    else load()
   }
 
   async function softDeleteVisit(v: VisitWithItems) {
@@ -189,6 +202,8 @@ export default function CustomerPage() {
         )}
       </div>
 
+      <CustomerDocuments customerId={customer.id} />
+
       {showVisitForm && (
         <VisitForm
           customerId={customer.id}
@@ -251,6 +266,7 @@ export default function CustomerPage() {
                     window.scrollTo({ top: 0, behavior: 'smooth' })
                   }}
                   onDelete={() => setConfirming({ kind: 'visit', visit: v })}
+                  onMarkContacted={() => markContacted(v)}
                 />
               ))}
             </tbody>
@@ -287,13 +303,16 @@ function VisitRows({
   onToggle,
   onEdit,
   onDelete,
+  onMarkContacted,
 }: {
   visit: VisitWithItems
   expanded: boolean
   onToggle: () => void
   onEdit: () => void
   onDelete: () => void
+  onMarkContacted: () => void
 }) {
+  const awaitingWarranty = v.warranty_followup && !v.warranty_contacted_at
   const purchaseLines = v.visit_items.map((it) =>
     [ITEM_TYPE_LABELS[it.item_type], [it.brand, it.model ?? it.description].filter(Boolean).join(' ')]
       .filter(Boolean)
@@ -309,6 +328,11 @@ function VisitRows({
           {v.visit_type && (
             <div className={`vtype-pill vtype-${v.visit_type}`}>
               {v.visit_type === 'glasses' ? '👓 Glasses' : 'Contact lens'}
+            </div>
+          )}
+          {v.warranty_followup && (
+            <div className={`vtype-pill ${v.warranty_contacted_at ? 'warranty-done' : 'warranty-due'}`}>
+              {v.warranty_contacted_at ? 'Warranty ✓' : 'Warranty'}
             </div>
           )}
         </td>
@@ -373,6 +397,18 @@ function VisitRows({
                 <div className="muted">
                   Discount: {v.discount}
                   {v.total_rm != null && <> · Total after discount: RM {v.total_rm.toFixed(2)}</>}
+                </div>
+              )}
+
+              {awaitingWarranty && (
+                <div className="collect-strip">
+                  <span>
+                    <strong>Warranty follow-up due</strong>
+                    {v.warranty_note && <span className="muted"> — {v.warranty_note}</span>}
+                  </span>
+                  <button className="btn btn-small btn-primary" onClick={onMarkContacted}>
+                    Mark contacted
+                  </button>
                 </div>
               )}
 

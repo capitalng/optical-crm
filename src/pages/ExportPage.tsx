@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { downloadCsv, fetchAllRows, toCsv } from '../lib/csv'
+import { supabase } from '../lib/supabase'
+import type { DocumentUsage } from '../lib/types'
+import { PLAN_STORAGE_BYTES, formatBytes } from '../lib/documents'
 
 const TABLES: Record<string, string[]> = {
   customers: [
@@ -29,6 +32,9 @@ const TABLES: Record<string, string[]> = {
     'discount',
     'total_rm',
     'notes',
+    'warranty_followup',
+    'warranty_note',
+    'warranty_contacted_at',
     'created_at',
     'updated_at',
     'deleted_at',
@@ -48,10 +54,77 @@ const TABLES: Record<string, string[]> = {
     'created_at',
     'id',
   ],
+  customer_documents: [
+    'customer_id',
+    'file_name',
+    'label',
+    'doc_date',
+    'byte_size',
+    'content_type',
+    'storage_path',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+    'id',
+  ],
+}
+
+const TABLE_LABELS: Record<string, string> = {
+  customers: 'All customers',
+  visits: 'All visits',
+  visit_items: 'All purchase items',
+  customer_documents: 'Document list',
 }
 
 function stamp(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+function StorageMeter() {
+  const [usage, setUsage] = useState<DocumentUsage | null>(null)
+
+  useEffect(() => {
+    supabase
+      .from('customer_documents_usage')
+      .select('*')
+      .single()
+      .then(({ data }) => {
+        if (data) setUsage(data as DocumentUsage)
+      })
+  }, [])
+
+  if (!usage) return null
+
+  const used = Number(usage.active_bytes) + Number(usage.deleted_bytes)
+  const pct = Math.min(100, (used / PLAN_STORAGE_BYTES) * 100)
+  const nearFull = pct >= 80
+
+  return (
+    <div className={nearFull ? 'error-box' : 'card'}>
+      <strong>
+        {usage.active_count} document{usage.active_count === 1 ? '' : 's'} · {formatBytes(used)} of{' '}
+        {formatBytes(PLAN_STORAGE_BYTES)} used ({pct.toFixed(0)}%)
+      </strong>
+      <div className="storage-bar">
+        <div className="storage-bar-fill" style={{ width: `${Math.max(pct, 1)}%` }} />
+      </div>
+      {nearFull && (
+        <p>
+          Storage is nearly full. Upgrade to Supabase Pro (100 GB, ~USD 25/month) in Dashboard →
+          Settings → Billing, or clear out removed documents.
+        </p>
+      )}
+      {Number(usage.deleted_bytes) > 0 && (
+        <p className="muted">
+          Including {formatBytes(Number(usage.deleted_bytes))} in {usage.deleted_count} removed
+          document{usage.deleted_count === 1 ? '' : 's'} that could be reclaimed.
+        </p>
+      )}
+      <p className="muted">
+        Counts files uploaded through this app. The exact figure is in Dashboard → Storage.
+      </p>
+    </div>
+  )
 }
 
 export default function ExportPage() {
@@ -84,18 +157,29 @@ export default function ExportPage() {
         happens to the online database.
       </p>
       <div className="btn-row">
-        <button className="btn btn-primary" onClick={() => exportTable('customers')}>
-          All customers (CSV)
-        </button>
-        <button className="btn btn-primary" onClick={() => exportTable('visits')}>
-          All visits (CSV)
-        </button>
-        <button className="btn btn-primary" onClick={() => exportTable('visit_items')}>
-          All purchase items (CSV)
-        </button>
+        {(Object.keys(TABLES) as Array<keyof typeof TABLES>).map((t) => (
+          <button key={t} className="btn btn-primary" onClick={() => exportTable(t)}>
+            {TABLE_LABELS[t]} (CSV)
+          </button>
+        ))}
       </div>
       {status && <div className="card" style={{ marginTop: 16 }}>{status}</div>}
       {error && <div className="error-box">{error}</div>}
+
+      <h3 style={{ marginTop: 28 }}>Attached documents</h3>
+      <p className="muted">
+        The document list above records which PDF belongs to which customer, but{' '}
+        <strong>it is not the files themselves</strong> — those live in Supabase Storage and need a
+        separate copy. To download them all at once, run this on the shop desktop:
+      </p>
+      <p>
+        <code>supabase storage cp -r ss://customer-docs ./optical-scans-backup --experimental</code>
+      </p>
+      <p className="muted">
+        Or download them from Dashboard → Storage → customer-docs. The file names there match the
+        “storage_path” column in the document list CSV.
+      </p>
+      <StorageMeter />
     </div>
   )
 }

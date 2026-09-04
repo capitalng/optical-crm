@@ -40,6 +40,10 @@ export interface Visit {
   discount: string | null
   total_rm: number | null
   notes: string | null
+  /** true = product carries a warranty; contact the buyer within the window */
+  warranty_followup: boolean
+  warranty_note: string | null
+  warranty_contacted_at: string | null
   deleted_at: string | null
   created_at: string
   updated_at: string
@@ -65,6 +69,44 @@ export interface VisitItem {
 /** A visit with its purchase items attached (shape returned by the nested select). */
 export interface VisitWithItems extends Visit {
   visit_items: VisitItem[]
+}
+
+/** A PDF (eye scan / report) attached to a customer. The file itself lives in Storage. */
+export interface CustomerDocument {
+  id: string
+  customer_id: string
+  storage_path: string
+  file_name: string
+  label: string | null
+  doc_date: string | null
+  byte_size: number | null
+  content_type: string
+  uploaded_by: string | null
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface DocumentUsage {
+  active_count: number
+  active_bytes: number
+  deleted_count: number
+  deleted_bytes: number
+}
+
+/** One row of the warranty follow-up list (returned by the warranty_followups RPC). */
+export interface WarrantyFollowup {
+  visit_id: string
+  customer_id: string
+  customer_name: string | null
+  customer_phone: string | null
+  customer_tags: string[] | null
+  ref_no: string | null
+  visit_date: string | null
+  purchased_at: string | null
+  warranty_note: string | null
+  total_rm: number | null
+  items: string | null
 }
 
 export const ITEM_TYPE_LABELS: Record<ItemType, string> = {

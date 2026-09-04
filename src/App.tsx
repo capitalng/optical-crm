@@ -8,6 +8,27 @@ import CustomerPage from './pages/CustomerPage'
 import CustomerFormPage from './pages/CustomerFormPage'
 import TrashPage from './pages/TrashPage'
 import ExportPage from './pages/ExportPage'
+import FollowUpsPage from './pages/FollowUpsPage'
+
+/** Small badge showing how many customers are due a warranty follow-up. */
+function FollowUpCount() {
+  const [count, setCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .rpc('warranty_followups', { window_days: 180 })
+      .then(({ data, error }) => {
+        if (!cancelled && !error && Array.isArray(data)) setCount(data.length)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (!count) return null
+  return <span className="nav-badge">{count}</span>
+}
 
 function SetupNotice() {
   return (
@@ -53,6 +74,10 @@ export default function App() {
           <NavLink to="/" end>
             Search
           </NavLink>
+          <NavLink to="/followups">
+            Warranty
+            <FollowUpCount />
+          </NavLink>
           <NavLink to="/trash">Trash</NavLink>
           <NavLink to="/export">Export</NavLink>
           <button className="btn btn-small" onClick={() => supabase.auth.signOut()}>
@@ -66,6 +91,7 @@ export default function App() {
           <Route path="/customer/new" element={<CustomerFormPage />} />
           <Route path="/customer/:id" element={<CustomerPage />} />
           <Route path="/customer/:id/edit" element={<CustomerFormPage />} />
+          <Route path="/followups" element={<FollowUpsPage />} />
           <Route path="/trash" element={<TrashPage />} />
           <Route path="/export" element={<ExportPage />} />
         </Routes>

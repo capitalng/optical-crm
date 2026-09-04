@@ -139,6 +139,9 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
   // Total fills itself from items − discount until the staff type their own figure.
   const [totalTouched, setTotalTouched] = useState(existing?.total_rm != null)
   const [notes, setNotes] = useState(existing?.notes ?? '')
+  // Opt-in: only for products that carry a warranty.
+  const [warrantyFollowup, setWarrantyFollowup] = useState(Boolean(existing?.warranty_followup))
+  const [warrantyNote, setWarrantyNote] = useState(existing?.warranty_note ?? '')
   const [items, setItems] = useState<ItemDraft[]>(() =>
     (existing?.visit_items ?? []).map(itemToDraft),
   )
@@ -227,6 +230,8 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
       customer_id: customerId,
       visit_date: visitDate || null,
       visit_type: visitType,
+      warranty_followup: warrantyFollowup,
+      warranty_note: warrantyFollowup ? clean(warrantyNote) : null,
       optometrist: clean(optometrist),
       discount: clean(discount),
       total_rm: total,
@@ -436,6 +441,31 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
             placeholder="0.00"
           />
         </div>
+      </div>
+
+      <div className="collect-block">
+        <label className="collect-switch">
+          <input
+            type="checkbox"
+            checked={warrantyFollowup}
+            onChange={(e) => setWarrantyFollowup(e.target.checked)}
+          />
+          <span>Warranty — follow up with this customer</span>
+        </label>
+
+        {warrantyFollowup && (
+          <div className="collect-fields">
+            <label>
+              What is covered (optional)
+              <input
+                type="text"
+                value={warrantyNote}
+                onChange={(e) => setWarrantyNote(e.target.value)}
+                placeholder="e.g. frame 1-year warranty"
+              />
+            </label>
+          </div>
+        )}
       </div>
 
       <label>
