@@ -1459,3 +1459,10 @@ textarea:focus {
     width: 100%;
   }
 }
+
+.warranty-search {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0;
+  max-width: 520px;
+}

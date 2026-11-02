@@ -212,3 +212,38 @@ Accepted formats: PDF, JPEG, PNG, WebP, HEIC, TIFF — 25 MB per file.
   long to work through by hand.
 - **Retire the old site** — after 2–4 weeks of smooth running, ask the old
   developer/host to take `capital.ergroup.info` down.
+
+
+## Warranty start dates and contacted history (November 2026 update)
+
+For an existing database, run `supabase/patch-warranty-start-and-history.sql`
+in Supabase SQL Editor **before publishing the code**. This patch assumes the
+original warranty feature is installed. Do not rerun the full `schema.sql`.
+
+The patch preserves contact history and fills existing flagged visits' warranty
+start dates from their previous visit dates (or creation dates). Re-running it
+will not overwrite edited dates or deliberately blank dates. New flagged visits
+can leave the start date blank while awaiting collection. Set the collection
+date in Edit visit when the product is collected. The visit date is unchanged.
+
+The Warranty page has To contact, Contacted, and Window ended sections.
+Contacted records stay available regardless of age. Undo clears the contacted
+status; active warranties return to To contact, and expired warranties return to
+Window ended. Expiry moves a record between sections without deleting it.
+Each record represents one flagged visit, so customers with multiple purchases
+have separate entries. The six-month window uses calendar months from the
+warranty start date, with month-end dates clamped to the final day of the month.
+
+After applying the patch:
+
+1. Run `npm test` and `npm run build` locally.
+2. Commit the changed source, test, documentation, and new SQL patch; push to GitHub.
+3. Wait for the Cloudflare deployment to succeed, then refresh the shop's tablet.
+4. Find the accidentally contacted purchase under Contacted and press Undo contacted.
+5. Edit a visit: choose a collection date different from the visit date, save, and
+   verify the Warranty page uses the collection date for its countdown.
+6. Leave a new warranty start date blank and verify it shows Awaiting collection.
+
+The local regression tests cover contact/undo classification, custom start dates,
+calendar-month expiry, leap years, and the Malaysian date boundary. Database
+permissions and saving should also be checked against the shop's Supabase project.

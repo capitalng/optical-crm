@@ -87,6 +87,7 @@ create table public.visits (
   notes        text,
   -- Warranty follow-up is opt-in: false = nothing to chase (most visits).
   warranty_followup     boolean not null default false,
+  warranty_start_date   date,
   warranty_note         text,
   warranty_contacted_at timestamptz,
   deleted_at   timestamptz,
@@ -366,3 +367,34 @@ create policy "staff insert customer documents"
   on public.customer_documents for insert to authenticated with check (true);
 create policy "staff update customer documents"
   on public.customer_documents for update to authenticated using (true);
+
+create index if not exists visits_warranty_history
+  on public.visits (warranty_start_date, id)
+  where warranty_followup and deleted_at is null;
+
+create or replace function public.warranty_followups_v2()
+returns table (
+  visit_id uuid, customer_id uuid, customer_name text, customer_phone text,
+  customer_tags text[], ref_no text, visit_date date,
+  warranty_start_date date, warranty_contacted_at timestamptz,
+  warranty_note text, total_rm numeric, items text
+)
+language sql stable security invoker
+set search_path = public
+as $$
+  select v.id, c.id, c.name, c.phone, c.tags, c.ref_no, v.visit_date,
+    v.warranty_start_date, v.warranty_contacted_at, v.warranty_note, v.total_rm,
+    (
+      select string_agg(
+        coalesce(nullif(btrim(concat_ws(' ', i.brand, coalesce(i.model, i.description))), ''),
+          initcap(replace(i.item_type, '_', ' '))), ', ' order by i.created_at, i.id)
+      from public.visit_items i where i.visit_id = v.id
+    )
+  from public.visits v
+  join public.customers c on c.id = v.customer_id
+  where v.deleted_at is null and c.deleted_at is null and v.warranty_followup
+  order by v.warranty_start_date asc nulls first, v.id
+$$;
+
+revoke all on function public.warranty_followups_v2() from public, anon;
+grant execute on function public.warranty_followups_v2() to authenticated;

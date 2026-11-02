@@ -9,20 +9,36 @@ import CustomerFormPage from './pages/CustomerFormPage'
 import TrashPage from './pages/TrashPage'
 import ExportPage from './pages/ExportPage'
 import FollowUpsPage from './pages/FollowUpsPage'
+import { loadWarrantyRecords } from './lib/warranty-records'
+import { malaysiaToday, warrantySection } from './lib/warranty'
 
 /** Small badge showing how many customers are due a warranty follow-up. */
 function FollowUpCount() {
   const [count, setCount] = useState<number | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-    supabase
-      .rpc('warranty_followups', { window_days: 180 })
-      .then(({ data, error }) => {
-        if (!cancelled && !error && Array.isArray(data)) setCount(data.length)
-      })
+    let controller: AbortController | null = null
+    const refresh = async () => {
+      controller?.abort()
+      const request = new AbortController()
+      controller = request
+      try {
+        const records = await loadWarrantyRecords(request.signal)
+        if (request.signal.aborted) return
+        const today = malaysiaToday(new Date())
+        setCount(records.filter((row) => warrantySection(row, today, 6) === 'pending').length)
+      } catch {
+        if (!request.signal.aborted) setCount(null)
+      }
+    }
+    const onRefresh = () => { void refresh() }
+    onRefresh()
+    window.addEventListener('warranty-updated', onRefresh)
+    window.addEventListener('focus', onRefresh)
     return () => {
-      cancelled = true
+      controller?.abort()
+      window.removeEventListener('warranty-updated', onRefresh)
+      window.removeEventListener('focus', onRefresh)
     }
   }, [])
 

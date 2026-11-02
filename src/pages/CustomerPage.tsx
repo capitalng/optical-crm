@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Customer, VisitWithItems } from '../lib/types'
@@ -45,6 +45,8 @@ export default function CustomerPage() {
   >(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [warrantyBusy, setWarrantyBusy] = useState(false)
+  const warrantySaving = useRef(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -94,16 +96,26 @@ export default function CustomerPage() {
     else navigate('/')
   }
 
-  async function markContacted(v: VisitWithItems) {
-    const { data, error } = await supabase
-      .from('visits')
-      .update({ warranty_contacted_at: new Date().toISOString() })
-      .eq('id', v.id)
-      .select('id')
-    if (error) setError('Could not update: ' + error.message)
-    else if (!data || data.length === 0)
-      setError('Could not update: the database did not change the record.')
-    else load()
+  async function markContacted(visit: VisitWithItems) {
+    if (warrantySaving.current) return
+    warrantySaving.current = true
+    setWarrantyBusy(true)
+    setError(null)
+    const contactedAt = visit.warranty_contacted_at ? null : new Date().toISOString()
+    try {
+      const { data, error: updateError } = await supabase.from('visits')
+        .update({ warranty_contacted_at: contactedAt }).eq('id', visit.id).select('id')
+      if (updateError) throw new Error(`Could not update warranty: ${updateError.message}`)
+      if (!data?.length) throw new Error('The database did not update the warranty record.')
+      setVisits((previous) => previous.map((record) => record.id === visit.id
+        ? { ...record, warranty_contacted_at: contactedAt } : record))
+      window.dispatchEvent(new Event('warranty-updated'))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not update warranty.')
+    } finally {
+      warrantySaving.current = false
+      setWarrantyBusy(false)
+    }
   }
 
   async function softDeleteVisit(v: VisitWithItems) {
@@ -267,6 +279,7 @@ export default function CustomerPage() {
                   }}
                   onDelete={() => setConfirming({ kind: 'visit', visit: v })}
                   onMarkContacted={() => markContacted(v)}
+                  warrantyBusy={warrantyBusy}
                 />
               ))}
             </tbody>
@@ -304,6 +317,7 @@ function VisitRows({
   onEdit,
   onDelete,
   onMarkContacted,
+  warrantyBusy,
 }: {
   visit: VisitWithItems
   expanded: boolean
@@ -311,8 +325,8 @@ function VisitRows({
   onEdit: () => void
   onDelete: () => void
   onMarkContacted: () => void
+  warrantyBusy: boolean
 }) {
-  const awaitingWarranty = v.warranty_followup && !v.warranty_contacted_at
   const purchaseLines = v.visit_items.map((it) =>
     [ITEM_TYPE_LABELS[it.item_type], [it.brand, it.model ?? it.description].filter(Boolean).join(' ')]
       .filter(Boolean)
@@ -400,14 +414,17 @@ function VisitRows({
                 </div>
               )}
 
-              {awaitingWarranty && (
+              {v.warranty_followup && (
                 <div className="collect-strip">
                   <span>
-                    <strong>Warranty follow-up due</strong>
+                    <strong>{v.warranty_contacted_at ? 'Contacted' : 'Warranty follow-up'}</strong>
+                    <div className="muted">
+                      {v.warranty_start_date ? `Warranty starts: ${v.warranty_start_date}` : 'Awaiting collection — start date not set'}
+                    </div>
                     {v.warranty_note && <span className="muted"> — {v.warranty_note}</span>}
                   </span>
-                  <button className="btn btn-small btn-primary" onClick={onMarkContacted}>
-                    Mark contacted
+                  <button className="btn btn-small btn-primary" disabled={warrantyBusy} onClick={onMarkContacted}>
+                    {v.warranty_contacted_at ? 'Undo contacted' : 'Mark contacted'}
                   </button>
                 </div>
               )}

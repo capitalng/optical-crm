@@ -1,163 +1,170 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { WarrantyFollowup } from '../lib/types'
-import { buildWhatsAppUrl, formatWhatsAppNumber, toWhatsAppNumber } from '../lib/phone'
+import { loadWarrantyRecords } from '../lib/warranty-records'
+import { malaysiaToday, warrantyDaysBetween, warrantyEndDate, warrantySection } from '../lib/warranty'
+import type { WarrantySection } from '../lib/warranty'
+import { buildWhatsAppUrl, toWhatsAppNumber } from '../lib/phone'
 import TagBadges from '../components/TagBadges'
 
-/** How long after purchase the shop wants to have contacted the customer. */
-const WINDOW_DAYS = 180
-
-const WINDOWS = [
-  { days: 90, label: '3 months' },
-  { days: 180, label: '6 months' },
-  { days: 365, label: '1 year' },
+const SECTIONS: { key: WarrantySection; label: string }[] = [
+  { key: 'pending', label: 'To contact' },
+  { key: 'contacted', label: 'Contacted' },
+  { key: 'ended', label: 'Window ended' },
 ]
 
-function daysSince(iso: string | null): number {
-  if (!iso) return 0
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
-}
-
-/** "3 months ago", "12 days ago" — how long since the purchase. */
-function sincePurchase(iso: string | null): string {
-  const days = daysSince(iso)
-  if (days <= 0) return 'today'
-  if (days < 60) return `${days} day${days === 1 ? '' : 's'} ago`
-  return `${Math.floor(days / 30)} months ago`
-}
-
-function formatDay(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-MY', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
+function timingLabel(row: WarrantyFollowup, today: string, months: number): string {
+  if (!row.warranty_start_date) return 'Awaiting collection - set the start date when collected'
+  const elapsed = warrantyDaysBetween(row.warranty_start_date, today)
+  if (elapsed < 0) return `Starts in ${-elapsed} days`
+  const remaining = warrantyDaysBetween(today, warrantyEndDate(row.warranty_start_date, months))
+  if (remaining <= 0) return `${elapsed} days since warranty started | Follow-up window ended`
+  return `${elapsed} days since warranty started | ${remaining} days left to contact`
 }
 
 export default function FollowUpsPage() {
   const [rows, setRows] = useState<WarrantyFollowup[]>([])
-  const [windowDays, setWindowDays] = useState(WINDOW_DAYS)
+  const [months, setMonths] = useState(6)
+  const [section, setSection] = useState<WarrantySection>('pending')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [today, setToday] = useState(() => malaysiaToday(new Date()))
+  const [query, setQuery] = useState('')
+  const operation = useRef<AbortController | null>(null)
+  const mutationBusy = useRef(false)
+  const alive = useRef(true)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal: AbortSignal) => {
     setLoading(true)
     setError(null)
-    const { data, error } = await supabase.rpc('warranty_followups', {
-      window_days: windowDays,
-    })
-    if (error) setError(error.message)
-    else setRows((data as WarrantyFollowup[]) ?? [])
-    setLoading(false)
-  }, [windowDays])
+    try {
+      const records = await loadWarrantyRecords(signal)
+      if (signal.aborted) return
+      setRows(records)
+    } catch (cause) {
+      if (signal.aborted) return
+      setError(cause instanceof Error ? cause.message : 'Could not load warranty records.')
+    } finally {
+      if (!signal.aborted) setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    load()
+    alive.current = true
+    const controller = new AbortController()
+    void load(controller.signal)
+    const timer = window.setInterval(() => setToday(malaysiaToday(new Date())), 60_000)
+    return () => {
+      alive.current = false
+      controller.abort()
+      operation.current?.abort()
+      window.clearInterval(timer)
+    }
   }, [load])
 
-  async function markContacted(row: WarrantyFollowup) {
-    const { data, error } = await supabase
-      .from('visits')
-      .update({ warranty_contacted_at: new Date().toISOString() })
-      .eq('id', row.visit_id)
-      .select('id')
-    if (error) setError('Could not update: ' + error.message)
-    else if (!data || data.length === 0)
-      setError('Could not update: the database did not change the record.')
-    else load()
+  async function setContacted(row: WarrantyFollowup, contacted: boolean) {
+    if (mutationBusy.current) return
+    mutationBusy.current = true
+    const controller = new AbortController()
+    operation.current = controller
+    setBusyId(row.visit_id)
+    setError(null)
+    setNotice(null)
+    const timestamp = contacted ? new Date().toISOString() : null
+    try {
+      const { data, error: updateError } = await supabase.from('visits')
+        .update({ warranty_contacted_at: timestamp }).eq('id', row.visit_id)
+        .select('id').abortSignal(controller.signal)
+      if (updateError) throw new Error(`Could not update warranty: ${updateError.message}`)
+      if (!data?.length) throw new Error('The record was not updated. Please reload and try again.')
+      if (!alive.current) return
+      setRows((previous) => previous.map((record) => record.visit_id === row.visit_id
+        ? { ...record, warranty_contacted_at: timestamp } : record))
+      window.dispatchEvent(new Event('warranty-updated'))
+      if (contacted) {
+        setNotice('Moved to Contacted. Open that section to undo.')
+        return
+      }
+      const target = warrantySection({ ...row, warranty_contacted_at: null }, today, months)
+      setSection(target)
+      setNotice(target === 'ended'
+        ? 'Contact status undone. The follow-up window has ended; edit the visit to correct its start date if needed.'
+        : 'Moved back to To contact.')
+    } catch (cause) {
+      if (!alive.current) return
+      setError(cause instanceof Error ? cause.message : 'Could not update warranty.')
+    } finally {
+      mutationBusy.current = false
+      if (alive.current) setBusyId(null)
+    }
   }
 
-  const windowLabel = WINDOWS.find((w) => w.days === windowDays)?.label ?? `${windowDays} days`
+  const counts = Object.fromEntries(SECTIONS.map(({ key }) => [key,
+    rows.filter((row) => warrantySection(row, today, months) === key).length]))
+  const search = query.trim().toLowerCase()
+  const visible = rows.filter((row) => warrantySection(row, today, months) === section)
+    .filter((row) => !search || [row.customer_name, row.customer_phone, row.ref_no, row.items]
+      .some((value) => value?.toLowerCase().includes(search)))
 
   return (
     <div>
       <div className="page-head">
         <div>
           <h2>Warranty follow-ups</h2>
-          <p className="muted">
-            Customers who bought something under warranty and should be contacted within{' '}
-            {windowLabel} of their purchase. They leave this list once you mark them contacted, or
-            automatically when the {windowLabel} is up.
-          </p>
+          <p className="muted">Follow up within {months} months of the warranty start date. Contacted records stay available with Undo.</p>
         </div>
         <label className="bday-box">
-          <span>Within</span>
-          <select value={windowDays} onChange={(e) => setWindowDays(Number(e.target.value))}>
-            {WINDOWS.map((w) => (
-              <option key={w.days} value={w.days}>
-                {w.label}
-              </option>
-            ))}
+          <span>Follow-up window</span>
+          <select value={months} onChange={(event) => setMonths(Number(event.target.value))}>
+            <option value={3}>3 months</option><option value={6}>6 months</option><option value={12}>1 year</option>
           </select>
         </label>
       </div>
-
-      {error && <div className="error-box">{error}</div>}
-
-      <div className="result-meta muted">
-        {loading
-          ? 'Loading…'
-          : `${rows.length} customer${rows.length === 1 ? '' : 's'} to contact`}
+      <div className="btn-row" role="group" aria-label="Warranty sections">
+        {SECTIONS.map(({ key, label }) => (
+          <button type="button" key={key} aria-pressed={section === key}
+            className={`btn ${section === key ? 'btn-primary' : ''}`}
+            onClick={() => { setSection(key); setNotice(null) }}>
+            {label} ({counts[key] ?? 0})
+          </button>
+        ))}
       </div>
-
-      {!loading && rows.length === 0 && (
-        <div className="card muted">
-          Nobody to contact. Customers appear here when a visit is saved with “Warranty — follow up
-          with this customer” ticked.
-        </div>
-      )}
-
-      {rows.map((row) => {
-        const elapsed = daysSince(row.purchased_at)
-        const remaining = windowDays - elapsed
-        const urgent = remaining <= 30
+      <label className="warranty-search">Find a customer or purchase
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, phone, ref or item" />
+      </label>
+      {error && <div className="error-box" role="alert">{error}</div>}
+      {notice && <p role="status">{notice}</p>}
+      {loading && <p role="status">Loading...</p>}
+      {!loading && !visible.length && <div className="card muted">No matching warranty records in this section.</div>}
+      {visible.map((row) => {
         const number = toWhatsAppNumber(row.customer_phone)
+        const remaining = row.warranty_start_date
+          ? warrantyDaysBetween(today, warrantyEndDate(row.warranty_start_date, months)) : null
+        const urgent = section === 'pending' && remaining !== null && remaining > 0 && remaining <= 30
         return (
           <div className={`card followup-row ${urgent ? 'followup-urgent' : ''}`} key={row.visit_id}>
             <div className="followup-main">
               <div className="followup-name">
                 <Link to={`/customer/${row.customer_id}`}>{row.customer_name ?? '(no name)'}</Link>
-                <TagBadges tags={row.customer_tags} />
-                <span className="muted"> · {row.ref_no ?? 'no ref'}</span>
+                <TagBadges tags={row.customer_tags} /><span className="muted"> | {row.ref_no ?? 'no ref'}</span>
               </div>
-              <div className="followup-detail">
-                <strong>{row.items ?? 'Purchase'}</strong>
-                {row.total_rm != null && <span className="muted"> · RM {row.total_rm}</span>}
-                {row.warranty_note && <span className="muted"> — {row.warranty_note}</span>}
+              <div className="followup-detail"><strong>{row.items ?? 'Purchase'}</strong>
+                {row.warranty_note && <span> - {row.warranty_note}</span>}
               </div>
-              <div className="followup-meta muted">
-                Bought {formatDay(row.purchased_at)} ({sincePurchase(row.purchased_at)})
-                {remaining > 0 ? (
-                  <span className={urgent ? 'followup-remaining' : undefined}>
-                    {' '}
-                    · {remaining} day{remaining === 1 ? '' : 's'} left to contact
-                  </span>
-                ) : (
-                  <span className="followup-remaining"> · window closing</span>
-                )}
-              </div>
+              <div className="followup-meta muted">Visit: {row.visit_date ?? '-'} | Warranty starts: {row.warranty_start_date ?? 'Not set'}</div>
+              <div className="followup-meta muted">{timingLabel(row, today, months)}</div>
+              {row.warranty_contacted_at && <div className="followup-meta muted">Contacted: {new Date(row.warranty_contacted_at).toLocaleDateString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' })}</div>}
             </div>
-
             <div className="followup-actions">
-              {row.customer_phone ? (
-                <span className="followup-phone">{row.customer_phone}</span>
-              ) : (
-                <span className="muted">No phone number</span>
-              )}
-              {number && (
-                <a
-                  className="btn btn-small"
-                  href={buildWhatsAppUrl(number)}
-                  target="_blank"
-                  rel="noopener"
-                >
-                  Open WhatsApp · {formatWhatsAppNumber(number)}
-                </a>
-              )}
-              <button className="btn btn-primary" onClick={() => markContacted(row)}>
-                Mark contacted
+              <span className="followup-phone">{row.customer_phone ?? 'No phone number'}</span>
+              {number && <a className="btn btn-small" href={buildWhatsAppUrl(number)} target="_blank" rel="noopener">Open WhatsApp</a>}
+              <Link className="btn btn-small" to={`/customer/${row.customer_id}`}>View / edit visit</Link>
+              <button type="button" className="btn btn-primary" disabled={busyId !== null}
+                onClick={() => void setContacted(row, !row.warranty_contacted_at)}>
+                {busyId === row.visit_id ? 'Saving…' : row.warranty_contacted_at ? 'Undo contacted' : 'Mark contacted'}
               </button>
             </div>
           </div>

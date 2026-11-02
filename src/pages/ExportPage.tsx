@@ -33,6 +33,7 @@ const TABLES: Record<string, string[]> = {
     'total_rm',
     'notes',
     'warranty_followup',
+    'warranty_start_date',
     'warranty_note',
     'warranty_contacted_at',
     'created_at',

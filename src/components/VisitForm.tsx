@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import type { ItemType, VisitItem, VisitWithItems } from '../lib/types'
 import { ITEM_TYPE_LABELS } from '../lib/types'
+import { normalizeDiopter } from '../lib/diopter'
 
 const RX_FIELDS = ['sph', 'cyl', 'axis', 'add', 'va', 'pd'] as const
 const RX_LABELS: Record<(typeof RX_FIELDS)[number], string> = {
@@ -101,20 +102,6 @@ function discountToRm(raw: string, subtotal: number | null): number | null {
   return Number.isNaN(n) ? null : n
 }
 
-/**
- * Shorthand diopter entry: SPH/CYL/ADD are always x.xx, so staff can skip the
- * dot — "-125" becomes "-1.25", "275" becomes "2.75", "+175" typed with a dot
- * stays as typed. Anything that isn't a plain signed integer (e.g. "PL",
- * "1.75") passes through untouched.
- */
-function normalizeDiopter(raw: string): string {
-  const s = raw.trim()
-  if (!/^[+-]?\d+$/.test(s)) return raw
-  const sign = s.startsWith('+') ? '+' : ''
-  const value = Number(s) / 100
-  return sign + value.toFixed(2)
-}
-
 const DIOPTER_FIELDS = new Set(['sph', 'cyl', 'add'])
 
 interface Props {
@@ -142,9 +129,11 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
   // Opt-in: only for products that carry a warranty.
   const [warrantyFollowup, setWarrantyFollowup] = useState(Boolean(existing?.warranty_followup))
   const [warrantyNote, setWarrantyNote] = useState(existing?.warranty_note ?? '')
+  const [warrantyStartDate, setWarrantyStartDate] = useState(existing?.warranty_start_date ?? '')
   const [items, setItems] = useState<ItemDraft[]>(() =>
     (existing?.visit_items ?? []).map(itemToDraft),
   )
+  const [editedRxFields, setEditedRxFields] = useState<Set<string>>(() => new Set())
   const [rx, setRx] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {}
     for (const eye of ['r', 'l']) {
@@ -182,6 +171,7 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
   }, [suggestedTotal, totalTouched])
 
   function setRxField(key: string, value: string) {
+    setEditedRxFields((previous) => new Set(previous).add(key))
     setRx((prev) => ({ ...prev, [key]: value }))
   }
 
@@ -231,6 +221,7 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
       visit_date: visitDate || null,
       visit_type: visitType,
       warranty_followup: warrantyFollowup,
+      warranty_start_date: warrantyStartDate || null,
       warranty_note: warrantyFollowup ? clean(warrantyNote) : null,
       optometrist: clean(optometrist),
       discount: clean(discount),
@@ -241,7 +232,7 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
       ...Object.fromEntries(
         Object.entries(rx).map(([k, v]) => [
           k,
-          clean(DIOPTER_FIELDS.has(k.slice(2)) ? normalizeDiopter(v) : v),
+          clean(normalizeDiopter(v, k.slice(2), editedRxFields.has(k))),
         ]),
       ),
     }
@@ -289,6 +280,7 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
       }
     }
 
+    window.dispatchEvent(new Event('warranty-updated'))
     onSaved()
   }
 
@@ -348,8 +340,8 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
                       value={rx[key]}
                       onChange={(e) => setRxField(key, e.target.value)}
                       onBlur={
-                        DIOPTER_FIELDS.has(f)
-                          ? () => setRxField(key, normalizeDiopter(rx[key]))
+                        DIOPTER_FIELDS.has(f) && editedRxFields.has(key)
+                          ? () => setRxField(key, normalizeDiopter(rx[key], f))
                           : undefined
                       }
                       placeholder={f === 'va' ? '1.0' : f === 'add' ? '+2.00' : ''}
@@ -455,6 +447,15 @@ export default function VisitForm({ customerId, existing, onSaved, onCancel }: P
 
         {warrantyFollowup && (
           <div className="collect-fields">
+            <label>
+              Warranty start date (collection date)
+              <input
+                type="date"
+                value={warrantyStartDate}
+                onChange={(e) => setWarrantyStartDate(e.target.value)}
+              />
+              <span className="muted">Leave blank until collected. Set this date when the customer collects the item.</span>
+            </label>
             <label>
               What is covered (optional)
               <input

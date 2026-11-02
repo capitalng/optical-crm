@@ -42,6 +42,7 @@ export interface Visit {
   notes: string | null
   /** true = product carries a warranty; contact the buyer within the window */
   warranty_followup: boolean
+  warranty_start_date: string | null
   warranty_note: string | null
   warranty_contacted_at: string | null
   deleted_at: string | null
@@ -103,7 +104,8 @@ export interface WarrantyFollowup {
   customer_tags: string[] | null
   ref_no: string | null
   visit_date: string | null
-  purchased_at: string | null
+  warranty_start_date: string | null
+  warranty_contacted_at: string | null
   warranty_note: string | null
   total_rm: number | null
   items: string | null
